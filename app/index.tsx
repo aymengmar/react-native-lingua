@@ -1,35 +1,47 @@
-import { TouchableOpacity, StyleSheet } from "react-native";
-import { router } from "expo-router";
-import { Text, View } from "@/tw";
+import { useAuth } from "@clerk/expo";
+import { Redirect, useRouter } from "expo-router";
+import { ActivityIndicator, TouchableOpacity, View } from "react-native";
+import { Text } from "@/tw";
 
 export default function Index() {
-  return (
-    <View className="flex-1 items-center justify-center bg-green-500 px-6">
-      <Text className="h2 mt-9 text-center color-lingua-purple">
-        Duolingo Clone
-      </Text>
+  const { isSignedIn, isLoaded, signOut } = useAuth();
+  const router = useRouter();
 
-      <Text className="mt-4 text-xl font-semibold text-white text-center">
-        Aymen App is working 🎉
-      </Text>
+  if (!isLoaded) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator size="large" color="#6C4EF5" />
+      </View>
+    );
+  }
+
+  if (!isSignedIn) {
+    return <Redirect href="/onboarding" />;
+  }
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.replace("/(auth)/sign-in");
+  };
+
+  return (
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF" }}>
+      <Text className="h2 text-foreground">Home</Text>
+      <Text className="body-md text-muted mt-2">You are signed in!</Text>
 
       <TouchableOpacity
-        style={styles.button}
-        onPress={() => router.push("/onboarding")}
-        activeOpacity={0.8}
+        onPress={handleSignOut}
+        style={{
+          marginTop: 32,
+          backgroundColor: "#6C4EF5",
+          borderRadius: 16,
+          paddingVertical: 14,
+          paddingHorizontal: 40,
+        }}
+        activeOpacity={0.85}
       >
-        <Text className="text-lg font-bold text-green-600">View Onboarding</Text>
+        <Text className="body-md font-poppins-semibold text-white">Sign Out</Text>
       </TouchableOpacity>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  button: {
-    marginTop: 32,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-  },
-});

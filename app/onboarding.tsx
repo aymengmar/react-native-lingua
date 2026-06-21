@@ -68,7 +68,7 @@ export default function OnboardingScreen() {
       <View className="px-6 pb-8 pt-2">
         <TouchableOpacity
           style={styles.button}
-          onPress={() => router.push("/")}
+          onPress={() => router.push("/(auth)/sign-up")}
           activeOpacity={0.85}
         >
           <Text className="text-lg font-poppins-semibold text-white">

@@ -1,3 +1,5 @@
+import { TouchableOpacity, StyleSheet } from "react-native";
+import { router } from "expo-router";
 import { Text, View } from "@/tw";
 
 export default function Index() {
@@ -11,9 +13,23 @@ export default function Index() {
         Aymen App is working 🎉
       </Text>
 
-      <View className="mt-8 rounded-2xl bg-white px-8 py-4">
-        <Text className="text-lg font-bold text-green-600">Get Started</Text>
-      </View>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={() => router.push("/onboarding")}
+        activeOpacity={0.8}
+      >
+        <Text className="text-lg font-bold text-green-600">View Onboarding</Text>
+      </TouchableOpacity>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  button: {
+    marginTop: 32,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+  },
+});

@@ -1,21 +1,59 @@
-import VerificationModal from "@/components/VerificationModal";
-import { images } from "@/constants/images";
-import { Text, View } from "@/tw";
-import { Image } from "@/tw/image";
-import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
-  StyleSheet,
-  TextInput,
   TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
 } from "react-native";
+import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { View, Text } from "@/tw";
+import { Image } from "@/tw/image";
+import { images } from "@/constants/images";
+import VerificationModal from "@/components/VerificationModal";
+import { useSignIn } from "@clerk/expo";
 
 export default function SignInScreen() {
+  const { signIn, fetchStatus } = useSignIn();
+
   const [email, setEmail] = useState("");
   const [showVerification, setShowVerification] = useState(false);
+
+  const isLoading = fetchStatus === "fetching";
+
+  const handleSignIn = async () => {
+    const { error } = await signIn.emailCode.sendCode({ emailAddress: email });
+    if (error) {
+      Alert.alert(
+        "Sign In Error",
+        error.longMessage || error.message || "Something went wrong."
+      );
+      return;
+    }
+    setShowVerification(true);
+  };
+
+  const handleVerify = async (code: string) => {
+    const { error } = await signIn.emailCode.verifyCode({ code });
+    if (error) throw error;
+
+    if (signIn.status === "complete") {
+      await signIn.finalize({
+        navigate: ({ decorateUrl }) => {
+          const url = decorateUrl("/");
+          router.replace(url as any);
+        },
+      });
+    }
+  };
+
+  const handleResend = async () => {
+    const { error } = await signIn.emailCode.sendCode({ emailAddress: email });
+    if (error) throw error;
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
@@ -65,59 +103,28 @@ export default function SignInScreen() {
 
           {/* Sign In button */}
           <TouchableOpacity
-            style={[styles.primaryBtn, { marginTop: 24 }]}
-            onPress={() => setShowVerification(true)}
+            style={[
+              styles.primaryBtn,
+              { marginTop: 24 },
+              (!email || isLoading) && styles.primaryBtnDisabled,
+            ]}
+            onPress={handleSignIn}
             activeOpacity={0.85}
+            disabled={!email || isLoading}
           >
-            <Text className="text-lg font-poppins-semibold text-white">
-              Sign In
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Divider */}
-        <View className="flex-row items-center px-6 my-6">
-          <View className="flex-1 bg-border" style={{ height: 1 }} />
-          <Text className="body-sm text-muted mx-3">or continue with</Text>
-          <View className="flex-1 bg-border" style={{ height: 1 }} />
-        </View>
-
-        {/* Social buttons */}
-        <View className="px-6" style={{ gap: 12 }}>
-          <TouchableOpacity style={styles.socialBtn} activeOpacity={0.8}>
-            <AntDesign name="google" size={20} color="#DB4437" />
-            <Text
-              className="body-md font-poppins-medium text-foreground"
-              style={{ marginLeft: 12 }}
-            >
-              Continue with Google
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.socialBtn} activeOpacity={0.8}>
-            <FontAwesome name="facebook" size={20} color="#1877F2" />
-            <Text
-              className="body-md font-poppins-medium text-foreground"
-              style={{ marginLeft: 12 }}
-            >
-              Continue with Facebook
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.socialBtn} activeOpacity={0.8}>
-            <AntDesign name="apple" size={20} color="#000000" />
-            <Text
-              className="body-md font-poppins-medium text-foreground"
-              style={{ marginLeft: 12 }}
-            >
-              Continue with Apple
-            </Text>
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text className="text-lg font-poppins-semibold text-white">
+                Sign In
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
 
         {/* Sign up link */}
         <View className="flex-row justify-center items-center mt-8 pb-4">
-          <Text className="body-md text-muted">Don’t have an account? </Text>
+          <Text className="body-md text-muted">{"Don't have an account? "}</Text>
           <TouchableOpacity onPress={() => router.replace("/(auth)/sign-up")}>
             <Text className="body-md font-poppins-semibold text-lingua-purple">
               Sign Up
@@ -130,6 +137,8 @@ export default function SignInScreen() {
         visible={showVerification}
         email={email}
         onClose={() => setShowVerification(false)}
+        onVerify={handleVerify}
+        onResend={handleResend}
       />
     </SafeAreaView>
   );
@@ -176,14 +185,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  socialBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    backgroundColor: "#FFFFFF",
+  primaryBtnDisabled: {
+    opacity: 0.6,
   },
 });

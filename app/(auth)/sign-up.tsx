@@ -1,23 +1,72 @@
+import VerificationModal from "@/components/VerificationModal";
+import { images } from "@/constants/images";
+import { Text, View } from "@/tw";
+import { Image } from "@/tw/image";
+import { useSignUp } from "@clerk/expo";
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import React, { useState } from "react";
+
 import {
+  ActivityIndicator,
+  Alert,
   SafeAreaView,
   ScrollView,
-  TouchableOpacity,
-  TextInput,
   StyleSheet,
+  TextInput,
+  TouchableOpacity,
 } from "react-native";
-import { router } from "expo-router";
-import { Ionicons, AntDesign, FontAwesome } from "@expo/vector-icons";
-import { View, Text } from "@/tw";
-import { Image } from "@/tw/image";
-import { images } from "@/constants/images";
-import VerificationModal from "@/components/VerificationModal";
 
 export default function SignUpScreen() {
+  const { signUp, fetchStatus } = useSignUp();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showVerification, setShowVerification] = useState(false);
+
+  const isLoading = fetchStatus === "fetching";
+
+  const handleSignUp = async () => {
+    const { error } = await signUp.password({ emailAddress: email, password });
+    if (error) {
+      Alert.alert(
+        "Sign Up Error",
+        error.longMessage || error.message || "Something went wrong."
+      );
+      return;
+    }
+
+    const { error: sendError } = await signUp.verifications.sendEmailCode();
+    if (sendError) {
+      Alert.alert(
+        "Error",
+        sendError.longMessage || sendError.message || "Failed to send code."
+      );
+      return;
+    }
+
+    setShowVerification(true);
+  };
+
+  const handleVerify = async (code: string) => {
+    const { error } = await signUp.verifications.verifyEmailCode({ code });
+    if (error) throw error;
+
+    if (signUp.status === "complete") {
+      await signUp.finalize({
+        navigate: ({ decorateUrl }) => {
+          const url = decorateUrl("/");
+          router.replace(url as any);
+        },
+      });
+    }
+  };
+
+  const handleResend = async () => {
+    const { error } = await signUp.verifications.sendEmailCode();
+    if (error) throw error;
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
@@ -92,44 +141,22 @@ export default function SignUpScreen() {
 
           {/* Sign Up button */}
           <TouchableOpacity
-            style={[styles.primaryBtn, { marginTop: 24 }]}
-            onPress={() => setShowVerification(true)}
+            style={[
+              styles.primaryBtn,
+              { marginTop: 24 },
+              (!email || !password || isLoading) && styles.primaryBtnDisabled,
+            ]}
+            onPress={handleSignUp}
             activeOpacity={0.85}
+            disabled={!email || !password || isLoading}
           >
-            <Text className="text-lg font-poppins-semibold text-white">
-              Sign Up
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Divider */}
-        <View className="flex-row items-center px-6 my-6">
-          <View className="flex-1 bg-border" style={{ height: 1 }} />
-          <Text className="body-sm text-muted mx-3">or continue with</Text>
-          <View className="flex-1 bg-border" style={{ height: 1 }} />
-        </View>
-
-        {/* Social buttons */}
-        <View className="px-6" style={{ gap: 12 }}>
-          <TouchableOpacity style={styles.socialBtn} activeOpacity={0.8}>
-            <AntDesign name="google" size={20} color="#DB4437" />
-            <Text className="body-md font-poppins-medium text-foreground" style={{ marginLeft: 12 }}>
-              Continue with Google
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.socialBtn} activeOpacity={0.8}>
-            <FontAwesome name="facebook" size={20} color="#1877F2" />
-            <Text className="body-md font-poppins-medium text-foreground" style={{ marginLeft: 12 }}>
-              Continue with Facebook
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.socialBtn} activeOpacity={0.8}>
-            <AntDesign name="apple" size={20} color="#000000" />
-            <Text className="body-md font-poppins-medium text-foreground" style={{ marginLeft: 12 }}>
-              Continue with Apple
-            </Text>
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text className="text-lg font-poppins-semibold text-white">
+                Sign Up
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -142,12 +169,17 @@ export default function SignUpScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Required for Clerk's bot sign-up protection */}
+        <View nativeID="clerk-captcha" />
       </ScrollView>
 
       <VerificationModal
         visible={showVerification}
         email={email}
         onClose={() => setShowVerification(false)}
+        onVerify={handleVerify}
+        onResend={handleResend}
       />
     </SafeAreaView>
   );
@@ -202,14 +234,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  socialBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    backgroundColor: "#FFFFFF",
+  primaryBtnDisabled: {
+    opacity: 0.6,
   },
 });

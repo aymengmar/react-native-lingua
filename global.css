@@ -1,0 +1,151 @@
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css";
+
+@import "nativewind/theme";
+
+/*
+  Tailwind v4 stores text sizes as rem CSS variables (e.g. --text-4xl: 2.25rem)
+  and line-heights as unitless ratios (e.g. --text-4xl--line-height: calc(2.5/2.25) ≈ 1.11).
+  react-native-css resolves these variables and strips units — rem becomes a bare
+  float (~2.25dp, invisible) and the unitless ratio also stays tiny (~1.11dp).
+
+  Fix: override the theme variables with explicit px values. react-native-css resolves
+  var(--text-4xl) → 36px → strips px → fontSize: 36dp  ✅
+  Same mechanism that already makes bg-green-500 work (var(--color-green-500) → #22c55e).
+
+  @utility text-* does NOT override built-in utilities in Tailwind v4; @theme does.
+*/
+@theme {
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 14px;
+  --text-sm--line-height: 20px;
+  --text-base: 16px;
+  --text-base--line-height: 24px;
+  --text-lg: 18px;
+  --text-lg--line-height: 28px;
+  --text-xl: 20px;
+  --text-xl--line-height: 28px;
+  --text-2xl: 24px;
+  --text-2xl--line-height: 32px;
+  --text-3xl: 30px;
+  --text-3xl--line-height: 36px;
+  --text-4xl: 36px;
+  --text-4xl--line-height: 44px;
+  --text-5xl: 48px;
+  --text-5xl--line-height: 56px;
+  --text-6xl: 60px;
+  --text-6xl--line-height: 68px;
+  --text-7xl: 72px;
+  --text-7xl--line-height: 80px;
+  --text-8xl: 96px;
+  --text-8xl--line-height: 108px;
+  --text-9xl: 128px;
+  --text-9xl--line-height: 144px;
+}
+
+@theme {
+  /* ── Brand Colors ─────────────────────────────────── */
+  --color-lingua-purple: #6C4EF5;
+  --color-lingua-deep: #5B38F6;
+  --color-lingua-blue: #4D88FF;
+  --color-lingua-green: #21C168;
+
+  /* ── Semantic Colors ──────────────────────────────── */
+  --color-success: #21C168;
+  --color-warning: #FFCB00;
+  --color-streak: #FF8A00;
+  --color-danger: #FF4D4F;
+  --color-info: #4D88FF;
+
+  /* ── Neutral Colors ───────────────────────────────── */
+  --color-foreground: #001328;
+  --color-muted: #6B7280;
+  --color-border: #E5E7EB;
+  --color-surface: #F6F7FB;
+  --color-background: #FFFFFF;
+
+  /* ── Poppins Font Families ────────────────────────── */
+  --font-poppins: 'Poppins-Regular';
+  --font-poppins-medium: 'Poppins-Medium';
+  --font-poppins-semibold: 'Poppins-SemiBold';
+  --font-poppins-bold: 'Poppins-Bold';
+
+  /* ── Extra Text Sizes (not in default Tailwind) ───── */
+  --text-11: 11px;
+  --text-11--line-height: 15.4px;
+  --text-13: 13px;
+  --text-13--line-height: 20.8px;
+}
+
+/* ── Typography Utilities ─────────────────────────────
+   Usage: className="h1"  className="body-md"
+   Each combines font-family, font-size, and line-height.
+───────────────────────────────────────────────────── */
+
+@utility h1 {
+  font-family: 'Poppins-Bold';
+  font-size: 32px;
+  line-height: 38.4px;
+}
+
+@utility h2 {
+  font-family: 'Poppins-SemiBold';
+  font-size: 24px;
+  line-height: 31.2px;
+}
+
+@utility h3 {
+  font-family: 'Poppins-SemiBold';
+  font-size: 20px;
+  line-height: 26px;
+}
+
+@utility h4 {
+  font-family: 'Poppins-Medium';
+  font-size: 16px;
+  line-height: 22.4px;
+}
+
+@utility body-lg {
+  font-family: 'Poppins-Regular';
+  font-size: 16px;
+  line-height: 25.6px;
+}
+
+@utility body-md {
+  font-family: 'Poppins-Regular';
+  font-size: 14px;
+  line-height: 22.4px;
+}
+
+@utility body-sm {
+  font-family: 'Poppins-Regular';
+  font-size: 13px;
+  line-height: 20.8px;
+}
+
+@utility caption {
+  font-family: 'Poppins-Regular';
+  font-size: 11px;
+  line-height: 15.4px;
+}
+
+@media android {
+  :root {
+    --font-mono: monospace;
+    --font-rounded: normal;
+    --font-serif: serif;
+    --font-sans: normal;
+  }
+}
+
+@media ios {
+  :root {
+    --font-mono: ui-monospace;
+    --font-serif: ui-serif;
+    --font-sans: system-ui;
+    --font-rounded: ui-rounded;
+  }
+}

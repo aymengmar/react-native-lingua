@@ -1,53 +1,51 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
+export const colors = {
+  primary: {
+    purple: '#6C4EF5',
+    deepPurple: '#5B38F6',
+    blue: '#4D88FF',
+    green: '#21C168',
+  },
+  semantic: {
+    success: '#21C168',
+    warning: '#FFCB00',
+    streak: '#FF8A00',
+    error: '#FF4D4F',
+    info: '#4D88FF',
+  },
+  neutral: {
+    textPrimary: '#001328',
+    textSecondary: '#6B7280',
+    border: '#E5E7EB',
+    surface: '#F6F7FB',
+    background: '#FFFFFF',
+  },
+} as const;
 
-import { Platform } from 'react-native';
+export const fonts = {
+  regular: 'Poppins-Regular',
+  medium: 'Poppins-Medium',
+  semiBold: 'Poppins-SemiBold',
+  bold: 'Poppins-Bold',
+} as const;
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+export const fontSizes = {
+  h1: 32,
+  h2: 24,
+  h3: 20,
+  h4: 16,
+  bodyLg: 16,
+  bodyMd: 14,
+  bodySm: 13,
+  caption: 11,
+} as const;
 
-export const Colors = {
-  light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
-  },
-  dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
-  },
-};
-
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-  },
-});
+export const lineHeights = {
+  h1: 32 * 1.2,     // 38.4
+  h2: 24 * 1.3,     // 31.2
+  h3: 20 * 1.3,     // 26
+  h4: 16 * 1.4,     // 22.4
+  bodyLg: 16 * 1.6, // 25.6
+  bodyMd: 14 * 1.6, // 22.4
+  bodySm: 13 * 1.6, // 20.8
+  caption: 11 * 1.4, // 15.4
+} as const;

@@ -53,6 +53,7 @@ export interface Lesson {
   phrases: PhraseItem[];
   activities: Activity[];
   goal: string;
+  imageUrl?: string;
   // Prompt used for future AI teacher (Vision Agent) audio lessons
   aiTeacherPrompt: string;
 }

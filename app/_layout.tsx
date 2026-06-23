@@ -72,6 +72,7 @@ function RootLayoutNav() {
         name="language-selection"
         options={{ headerShown: false }}
       />
+      <Stack.Screen name="lesson/[id]" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -98,7 +99,7 @@ export default function RootLayout() {
     <PostHogProvider
       client={posthog}
       autocapture={{
-        captureScreens: true,
+        captureScreens: false,
         captureTouches: true,
         propsToCapture: ["testID"],
       }}

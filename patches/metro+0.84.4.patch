@@ -1,0 +1,34 @@
+diff --git a/node_modules/metro/src/node-haste/DependencyGraph.js b/node_modules/metro/src/node-haste/DependencyGraph.js
+index 8222d8c..ca845d7 100644
+--- a/node_modules/metro/src/node-haste/DependencyGraph.js
++++ b/node_modules/metro/src/node-haste/DependencyGraph.js
+@@ -93,15 +93,21 @@ class DependencyGraph extends _events.default {
+   async ready() {
+     await this._initializedPromise;
+   }
+-  _onHasteChange({ changes, rootDir }) {
++  _onHasteChange(event) {
++    // Support both Metro 0.84+ format { changes, rootDir } and legacy
++    // { eventsQueue } format emitted by older NativeWind / react-native-css builds.
++    const changes = event?.changes;
++    const rootDir = event?.rootDir ?? '';
+     this._resolutionCache = new Map();
+-    [
+-      ...changes.addedFiles,
+-      ...changes.modifiedFiles,
+-      ...changes.removedFiles,
+-    ].forEach(([canonicalPath]) =>
+-      this.#packageCache.invalidate(_path.default.join(rootDir, canonicalPath)),
+-    );
++    if (changes) {
++      [
++        ...changes.addedFiles,
++        ...changes.modifiedFiles,
++        ...changes.removedFiles,
++      ].forEach(([canonicalPath]) =>
++        this.#packageCache.invalidate(_path.default.join(rootDir, canonicalPath)),
++      );
++    }
+     this._createModuleResolver();
+     this.emit("change");
+   }

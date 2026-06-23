@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "agent": {
+      "source": "visionagents.ai",
+      "sourceType": "well-known",
+      "computedHash": "fad4671a2e6a8a777390efa4463456c50e307bfdd50d4f960132d8fa684c6a13"
+    },
     "building-native-ui": {
       "source": "expo/skills",
       "sourceType": "github",
@@ -90,6 +95,42 @@
       "sourceType": "github",
       "skillPath": "plugins/expo/skills/native-data-fetching/SKILL.md",
       "computedHash": "21253dd72e2afa0cc0a6693295f043af3b149fa250c7aedef4d33144e69258ff"
+    },
+    "stream": {
+      "source": "GetStream/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/stream/SKILL.md",
+      "computedHash": "c77dfb3bc5be5397d378a8d2372ae700f209f5f744be3f387cfe4d4809623636"
+    },
+    "stream-android": {
+      "source": "GetStream/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/stream-android/SKILL.md",
+      "computedHash": "7e3aaa74a3862160cdec655a9a49949ab59cd5a9577778434d923b91cbbb562f"
+    },
+    "stream-builder": {
+      "source": "GetStream/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/stream-builder/SKILL.md",
+      "computedHash": "b145a320c29bde81aabf7a06a000bfd73a9c6085687b29098e3edcb237e5d5c5"
+    },
+    "stream-docs": {
+      "source": "GetStream/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/stream-docs/SKILL.md",
+      "computedHash": "f527d6199d59883240ddeac1022b19e231e1868ef8a48713157f172a0c28fc45"
+    },
+    "stream-flutter": {
+      "source": "GetStream/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/stream-flutter/SKILL.md",
+      "computedHash": "7a0dab935c6974d32fc936b99d4162efddf7e746823d3694171b9777e44e49ab"
+    },
+    "stream-react-native": {
+      "source": "GetStream/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/stream-react-native/SKILL.md",
+      "computedHash": "7789118ed942af09dca0677b79cc2007c07b2778624be94ccdfc2780dc60517e"
     },
     "upgrading-expo": {
       "source": "expo/skills",

@@ -1,8 +1,11 @@
 import { images } from "@/constants/images";
 import { getLanguageByCode } from "@/data/languages";
 import { getLessonById, getUnitById } from "@/data/units";
+import { useAudioCall, type AgentStatus } from "@/hooks/useAudioCall";
+import { toCallId } from "@/lib/stream";
 import { Text } from "@/tw";
 import { Image } from "@/tw/image";
+import { useUser } from "@clerk/expo";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState, useEffect } from "react";
@@ -12,6 +15,7 @@ import {
   StatusBar,
   StyleSheet,
   TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
 import {
   SafeAreaView,
@@ -24,19 +28,101 @@ const FEEDBACK = [
   { label: "Grammar", value: "Good", color: "#4B6FDE" },
 ] as const;
 
+/** Map a Stream calling state to a human-readable label shown in the header. */
+function statusLabel(
+  status: "idle" | "connecting" | "joined" | "reconnecting" | "error" | "ended"
+): string {
+  switch (status) {
+    case "connecting":
+      return "Connecting…";
+    case "joined":
+      return "Online";
+    case "reconnecting":
+      return "Reconnecting…";
+    case "error":
+      return "Connection failed";
+    case "ended":
+      return "Call ended";
+    default:
+      return "Connecting…";
+  }
+}
+
+/** Dot color for the connection indicator in the header. */
+function statusColor(
+  status: "idle" | "connecting" | "joined" | "reconnecting" | "error" | "ended"
+): string {
+  switch (status) {
+    case "joined":
+      return "#22C55E";
+    case "error":
+    case "ended":
+      return "#EF4444";
+    default:
+      return "#F59E0B";
+  }
+}
+
+function agentStatusLabel(s: AgentStatus): string {
+  switch (s) {
+    case "connecting":
+      return "Agent joining…";
+    case "connected":
+      return "Agent ready";
+    case "failed":
+      return "Agent unavailable";
+    default:
+      return "Agent idle";
+  }
+}
+
+function agentStatusColor(s: AgentStatus): string {
+  switch (s) {
+    case "connected":
+      return "#6C4EF5";
+    case "failed":
+      return "#EF4444";
+    case "connecting":
+      return "#F59E0B";
+    default:
+      return "#94A3B8";
+  }
+}
+
 export default function AudioLessonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const posthog = usePostHog();
+  const { user } = useUser();
 
-  const [isMicOn, setIsMicOn] = useState(true);
   const [showSubtitles, setShowSubtitles] = useState(true);
   const [phraseIndex, setPhraseIndex] = useState(0);
 
   const lesson = getLessonById(id);
   const unit = lesson ? getUnitById(lesson.unitId) : null;
   const language = unit ? getLanguageByCode(unit.languageCode) : null;
+
+  // Build a deterministic call ID from the lesson ID so every student who
+  // opens the same lesson joins the same audio room.
+  const callId = lesson ? `lesson-${toCallId(lesson.id)}` : null;
+
+  // Build lesson context once; values don't change during a lesson.
+  const lessonContext =
+    lesson && unit
+      ? {
+          language: unit.languageCode,
+          lessonTitle: lesson.title,
+          goal: lesson.goal,
+          aiTeacherPrompt: lesson.aiTeacherPrompt,
+          vocabulary: lesson.vocabulary,
+          phrases: lesson.phrases,
+        }
+      : null;
+
+  // Stream audio_room call — joins immediately, starts Vision Agent, cleans up on unmount.
+  const { status: callStatus, agentStatus, isMuted, toggleMic, endCall } =
+    useAudioCall(callId, lessonContext);
 
   // Track lesson start
   useEffect(() => {
@@ -63,12 +149,6 @@ export default function AudioLessonScreen() {
   }, [phraseIndex, lesson?.id, posthog]);
 
   if (!lesson) {
-    useEffect(() => {
-      posthog.capture("ai_lesson_not_found", {
-        lesson_id: id,
-      });
-    }, [id, posthog]);
-
     return (
       <SafeAreaView
         style={{ flex: 1, backgroundColor: "#FFFFFF" }}
@@ -89,12 +169,11 @@ export default function AudioLessonScreen() {
 
   const teacherPhrase = lesson.phrases[phraseIndex % lesson.phrases.length];
 
-  const handleMicToggle = () => {
-    const newState = !isMicOn;
-    setIsMicOn(newState);
+  const handleMicToggle = async () => {
+    await toggleMic();
     posthog.capture("ai_lesson_mic_toggled", {
       lesson_id: lesson.id,
-      mic_enabled: newState,
+      mic_enabled: isMuted, // will be toggled after this call
     });
   };
 
@@ -107,13 +186,14 @@ export default function AudioLessonScreen() {
     });
   };
 
-  const handleEndCall = () => {
+  const handleEndCall = async () => {
     posthog.capture("ai_lesson_ended", {
       lesson_id: lesson.id,
       lesson_title: lesson.title,
       phrases_completed: phraseIndex,
       total_phrases: lesson.phrases.length,
     });
+    await endCall();
     router.back();
   };
 
@@ -128,6 +208,14 @@ export default function AudioLessonScreen() {
   const handlePhraseAdvance = () => {
     setPhraseIndex((i) => i + 1);
   };
+
+  const displayName = user?.fullName ?? user?.firstName ?? "You";
+  const initials = displayName
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
@@ -146,8 +234,36 @@ export default function AudioLessonScreen() {
         <RNView style={styles.headerTitleGroup}>
           <Text style={styles.headerTitle}>AI Teacher</Text>
           <RNView style={styles.onlineRow}>
-            <RNView style={styles.onlineDot} />
-            <Text style={styles.onlineLabel}>Online</Text>
+            <RNView
+              style={[
+                styles.onlineDot,
+                { backgroundColor: statusColor(callStatus) },
+              ]}
+            />
+            <Text
+              style={[
+                styles.onlineLabel,
+                { color: statusColor(callStatus) },
+              ]}
+            >
+              {statusLabel(callStatus)}
+            </Text>
+          </RNView>
+          <RNView style={styles.onlineRow}>
+            <RNView
+              style={[
+                styles.onlineDot,
+                { backgroundColor: agentStatusColor(agentStatus) },
+              ]}
+            />
+            <Text
+              style={[
+                styles.onlineLabel,
+                { color: agentStatusColor(agentStatus) },
+              ]}
+            >
+              {agentStatusLabel(agentStatus)}
+            </Text>
           </RNView>
         </RNView>
 
@@ -170,19 +286,37 @@ export default function AudioLessonScreen() {
           contentFit="contain"
         />
 
-        {/* Student video thumbnail — top-right */}
+        {/* Student preview — top-right corner with user initials */}
         <RNView style={styles.userPreview}>
           <RNView style={styles.userPreviewBg} />
-          <RNView style={styles.userPreviewIcon}>
-            <Ionicons name="person" size={54} color="#8B6A50" />
-          </RNView>
+          {user?.imageUrl ? (
+            <Image
+              source={{ uri: user.imageUrl }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+            />
+          ) : (
+            <RNView style={styles.userInitialsWrap}>
+              <Text style={styles.userInitials}>{initials}</Text>
+            </RNView>
+          )}
+          {/* Muted badge on the student preview */}
+          {isMuted && (
+            <RNView style={styles.mutedBadge}>
+              <Ionicons name="mic-off" size={10} color="#FFFFFF" />
+            </RNView>
+          )}
         </RNView>
 
         {/* Teacher speech bubble */}
         <RNView style={styles.speechBubble}>
           <RNView style={styles.speechContent}>
             <Text style={styles.speechMain}>{teacherPhrase.phrase}</Text>
-            <Text style={styles.speechSub}>{teacherPhrase.translation} 👏</Text>
+            {showSubtitles && (
+              <Text style={styles.speechSub}>
+                {teacherPhrase.translation} 👏
+              </Text>
+            )}
           </RNView>
           <TouchableOpacity
             style={styles.speakerBtn}
@@ -192,6 +326,41 @@ export default function AudioLessonScreen() {
             <Ionicons name="volume-medium" size={20} color="#FFFFFF" />
           </TouchableOpacity>
         </RNView>
+
+        {/* Connecting overlay — shown while Stream call is joining */}
+        {(callStatus === "connecting" || callStatus === "idle") && (
+          <RNView style={styles.overlay}>
+            <ActivityIndicator size="large" color="#6C4EF5" />
+            <Text style={styles.overlayText}>Joining lesson…</Text>
+          </RNView>
+        )}
+
+        {/* Reconnecting overlay */}
+        {callStatus === "reconnecting" && (
+          <RNView style={styles.overlay}>
+            <ActivityIndicator size="large" color="#F59E0B" />
+            <Text style={styles.overlayText}>Reconnecting…</Text>
+          </RNView>
+        )}
+
+        {/* Error overlay */}
+        {callStatus === "error" && (
+          <RNView style={styles.overlay}>
+            <Ionicons name="warning-outline" size={40} color="#EF4444" />
+            <Text style={styles.overlayText}>Could not connect</Text>
+            <Text style={styles.overlaySubText}>
+              Check your connection and try again
+            </Text>
+          </RNView>
+        )}
+
+        {/* Ended overlay */}
+        {callStatus === "ended" && (
+          <RNView style={styles.overlay}>
+            <Ionicons name="checkmark-circle-outline" size={40} color="#22C55E" />
+            <Text style={styles.overlayText}>Lesson complete!</Text>
+          </RNView>
+        )}
       </RNView>
 
       {/* ── Bottom section ───────────────────────────────────── */}
@@ -225,16 +394,17 @@ export default function AudioLessonScreen() {
 
           <RNView style={styles.controlItem}>
             <TouchableOpacity
-              style={styles.controlBtn}
+              style={[styles.controlBtn, isMuted && styles.controlBtnOff]}
               onPress={handleMicToggle}
+              disabled={callStatus !== "joined"}
             >
               <Ionicons
-                name={isMicOn ? "mic" : "mic-off"}
+                name={isMuted ? "mic-off" : "mic"}
                 size={22}
-                color="#0F172A"
+                color={isMuted ? "#94A3B8" : "#0F172A"}
               />
             </TouchableOpacity>
-            <Text style={styles.controlLabel}>Mic</Text>
+            <Text style={styles.controlLabel}>{isMuted ? "Unmute" : "Mic"}</Text>
           </RNView>
 
           <RNView style={styles.controlItem}>
@@ -380,14 +550,34 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   userPreviewBg: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     backgroundColor: "#C8B89A",
   },
-  userPreviewIcon: {
+  userInitialsWrap: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "flex-end",
-    paddingBottom: 4,
+    justifyContent: "center",
+    backgroundColor: "#6C4EF5",
+  },
+  userInitials: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    fontFamily: "Poppins-Bold",
+  },
+  mutedBadge: {
+    position: "absolute",
+    bottom: 6,
+    right: 6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#EF4444",
+    alignItems: "center",
+    justifyContent: "center",
   },
   speechBubble: {
     position: "absolute",
@@ -430,6 +620,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginLeft: 12,
+  },
+
+  // ── State overlays ───────────────────────────────────────────
+  overlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  overlayText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    textAlign: "center",
+  },
+  overlaySubText: {
+    color: "#CBD5E1",
+    fontSize: 13,
+    fontFamily: "Poppins-Regular",
+    textAlign: "center",
+    paddingHorizontal: 32,
   },
 
   // ── Bottom section ───────────────────────────────────────────

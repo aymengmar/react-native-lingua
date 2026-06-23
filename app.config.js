@@ -29,6 +29,16 @@ export default {
     plugins: [
       "expo-router",
       "expo-secure-store",
+      "@stream-io/video-react-native-sdk",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          cameraPermission:
+            "$(PRODUCT_NAME) requires camera access to capture and transmit video",
+          microphonePermission:
+            "$(PRODUCT_NAME) requires microphone access to capture and transmit audio",
+        },
+      ],
       [
         "expo-splash-screen",
         {
@@ -45,6 +55,7 @@ export default {
         "expo-build-properties",
         {
           android: {
+            minSdkVersion: 24,
             packagingOptions: {
               exclude: ["META-INF/versions/9/OSGI-INF/MANIFEST.MF"],
             },

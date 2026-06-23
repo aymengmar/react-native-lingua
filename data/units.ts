@@ -1,5 +1,12 @@
 import type { Unit } from "@/types/learning";
-import { esLesson1, esLesson2, frLesson1, jaLesson1 } from "@/data/lessons";
+import {
+  esLesson1,
+  esLesson2,
+  frLesson1,
+  deLesson1,
+  ptLesson1,
+  jaLesson1,
+} from "@/data/lessons";
 
 export const units: Unit[] = [
   // --- Spanish ---
@@ -22,6 +29,28 @@ export const units: Unit[] = [
     description: "Greetings and introductions",
     color: "#1CB0F6",
     lessons: [frLesson1],
+  },
+
+  // --- German ---
+  {
+    id: "de-unit-1",
+    languageCode: "de",
+    order: 1,
+    title: "Basics 1",
+    description: "Greetings and introductions",
+    color: "#FFCB00",
+    lessons: [deLesson1],
+  },
+
+  // --- Portuguese ---
+  {
+    id: "pt-unit-1",
+    languageCode: "pt",
+    order: 1,
+    title: "Basics 1",
+    description: "Greetings and essentials",
+    color: "#21C168",
+    lessons: [ptLesson1],
   },
 
   // --- Japanese ---

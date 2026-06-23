@@ -4,6 +4,7 @@ import { useFonts } from "expo-font";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
+import { useLanguageStore } from "@/store/languageStore";
 import "../global.css";
 
 SplashScreen.preventAutoHideAsync();
@@ -18,22 +19,31 @@ function RootLayoutNav() {
   const { isSignedIn, isLoaded } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const { selectedLanguage, _hasHydrated } = useLanguageStore();
 
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded || !_hasHydrated) return;
 
     const inAuthGroup = segments[0] === "(auth)";
     const onOnboarding = segments[0] === "onboarding";
+    const onLanguageSelection = segments[0] === "language-selection";
 
     if (!isSignedIn && !inAuthGroup && !onOnboarding) {
       router.replace("/onboarding");
     } else if (isSignedIn && (inAuthGroup || onOnboarding)) {
-      router.replace("/");
+      if (!selectedLanguage) {
+        router.replace("/language-selection");
+      } else {
+        router.replace("/(tabs)");
+      }
+    } else if (isSignedIn && !selectedLanguage && !onLanguageSelection) {
+      router.replace("/language-selection");
     }
-  }, [isSignedIn, isLoaded, segments]);
+  }, [isSignedIn, isLoaded, segments, selectedLanguage, _hasHydrated]);
 
   return (
     <Stack>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />

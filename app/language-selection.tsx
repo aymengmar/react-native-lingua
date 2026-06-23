@@ -12,12 +12,14 @@ import { View, Text } from "@/tw";
 import { Image } from "@/tw/image";
 import { languages } from "@/data/languages";
 import { images } from "@/constants/images";
-import type { Language } from "@/types/learning";
+import { useLanguageStore } from "@/store/languageStore";
+import type { Language, LanguageCode } from "@/types/learning";
 
 export default function LanguageSelection() {
   const router = useRouter();
+  const { setSelectedLanguage } = useLanguageStore();
   const [search, setSearch] = useState("");
-  const [selectedCode, setSelectedCode] = useState("es");
+  const [selectedCode, setSelectedCode] = useState<LanguageCode>("es");
 
   const filtered = languages.filter((lang) =>
     lang.name.toLowerCase().includes(search.toLowerCase())
@@ -78,7 +80,10 @@ export default function LanguageSelection() {
       {/* Confirm button */}
       <View className="px-4 pt-2 pb-3">
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => {
+            setSelectedLanguage(selectedCode);
+            router.replace("/");
+          }}
           style={styles.confirmButton}
           activeOpacity={0.85}
         >

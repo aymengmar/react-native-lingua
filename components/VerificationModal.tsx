@@ -1,6 +1,7 @@
 import { Text, View } from "@/tw";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
+import { usePostHog } from "posthog-react-native";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -27,6 +28,7 @@ export default function VerificationModal({
   onVerify,
   onResend,
 }: Props) {
+  const posthog = usePostHog();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -65,6 +67,7 @@ export default function VerificationModal({
         err?.errors?.[0]?.message ||
         err?.message ||
         "Invalid code. Please try again.";
+      posthog.capture("email_verification_failed", { email, error_message: message });
       setError(message);
       setCode("");
     } finally {
@@ -76,6 +79,7 @@ export default function VerificationModal({
     if (!onResend || loading) return;
     setLoading(true);
     setError("");
+    posthog.capture("email_verification_code_resent", { email });
     try {
       await onResend();
     } catch (err: any) {

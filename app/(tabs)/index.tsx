@@ -9,6 +9,7 @@ import { useProgressStore } from "@/store/progressStore";
 import { images } from "@/constants/images";
 import { getLanguageByCode } from "@/data/languages";
 import { getUnitsByLanguage } from "@/data/units";
+import { usePostHog } from "posthog-react-native";
 
 const GREETINGS: Record<string, string> = {
   es: "Hola",
@@ -30,6 +31,7 @@ type PlanItem = {
 
 export default function HomeScreen() {
   const { user } = useUser();
+  const posthog = usePostHog();
   const { selectedLanguage } = useLanguageStore();
   const { currentXp, dailyGoalXp, streak, completedLessons } =
     useProgressStore();
@@ -167,6 +169,12 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   style={styles.continueBtn}
                   activeOpacity={0.85}
+                  onPress={() =>
+                    posthog.capture("continue_learning_tapped", {
+                      language: selectedLanguage,
+                      unit: currentUnit?.title,
+                    })
+                  }
                 >
                   <Text
                     className="body-md font-poppins-semibold"
@@ -204,6 +212,17 @@ export default function HomeScreen() {
             >
               {todaysPlan.map((item, index) => (
                 <View key={item.id}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() =>
+                      posthog.capture("todays_plan_item_tapped", {
+                        item_id: item.id,
+                        item_title: item.title,
+                        completed: item.completed,
+                        language: selectedLanguage,
+                      })
+                    }
+                  >
                   <View className="flex-row items-center px-4 py-3 gap-3">
                     {/* Icon */}
                     <View
@@ -234,6 +253,7 @@ export default function HomeScreen() {
                       <View className="w-6 h-6 rounded-full border-2 border-border" />
                     )}
                   </View>
+                  </TouchableOpacity>
 
                   {index < todaysPlan.length - 1 && (
                     <View className="h-px mx-4 bg-gray-100" />
@@ -259,7 +279,13 @@ export default function HomeScreen() {
                 style={{ width: 52, height: 52, borderRadius: 26 }}
                 contentFit="cover"
               />
-              <TouchableOpacity style={styles.videoBtn} activeOpacity={0.85}>
+              <TouchableOpacity
+                style={styles.videoBtn}
+                activeOpacity={0.85}
+                onPress={() =>
+                  posthog.capture("ai_video_call_started", { language: selectedLanguage })
+                }
+              >
                 <Ionicons name="videocam" size={20} color="#FFFFFF" />
               </TouchableOpacity>
             </View>

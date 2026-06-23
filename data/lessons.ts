@@ -153,6 +153,108 @@ export const frLesson1: Lesson = {
   ],
 };
 
+// German lessons
+export const deLesson1: Lesson = {
+  id: "de-u1-l1",
+  unitId: "de-unit-1",
+  order: 1,
+  title: "Hallo! Greetings",
+  description: "Learn your first German greetings",
+  xpReward: 10,
+  durationMinutes: 5,
+  goal: "Say hello and thank you confidently in German",
+  aiTeacherPrompt:
+    "You are a friendly German teacher. Teach the student basic greetings: Hallo, Tschüss, Guten Morgen, Guten Abend, Danke, Bitte. Use simple examples and encourage the student warmly.",
+  vocabulary: [
+    { word: "Hallo", translation: "Hello", pronunciation: "HA-lo" },
+    { word: "Tschüss", translation: "Goodbye", pronunciation: "CHOOS" },
+    { word: "Guten Morgen", translation: "Good morning", pronunciation: "GOO-ten MOR-gen" },
+    { word: "Guten Abend", translation: "Good evening", pronunciation: "GOO-ten AH-bend" },
+    { word: "Danke", translation: "Thank you", pronunciation: "DAHN-keh" },
+    { word: "Bitte", translation: "Please / You're welcome", pronunciation: "BIT-teh" },
+  ],
+  phrases: [
+    { phrase: "Wie heißt du?", translation: "What is your name?", context: "Informal" },
+    { phrase: "Ich heiße Max", translation: "My name is Max", context: "Introducing yourself" },
+    { phrase: "Freut mich", translation: "Nice to meet you" },
+  ],
+  activities: [
+    {
+      id: "de-u1-l1-a1",
+      type: "translation",
+      question: "What does 'Hallo' mean?",
+      answer: "Hello",
+      options: ["Goodbye", "Hello", "Thank you", "Please"],
+    },
+    {
+      id: "de-u1-l1-a2",
+      type: "translation",
+      question: "How do you say 'Thank you' in German?",
+      answer: "Danke",
+      options: ["Bitte", "Hallo", "Danke", "Tschüss"],
+    },
+    {
+      id: "de-u1-l1-a3",
+      type: "matching",
+      question: "Match: Tschüss",
+      answer: "Goodbye",
+      options: ["Hello", "Please", "Good morning", "Goodbye"],
+    },
+  ],
+};
+
+// Portuguese lessons
+export const ptLesson1: Lesson = {
+  id: "pt-u1-l1",
+  unitId: "pt-unit-1",
+  order: 1,
+  title: "Olá! Greetings",
+  description: "Learn your first Portuguese greetings",
+  xpReward: 10,
+  durationMinutes: 5,
+  goal: "Say hello and thank you confidently in Portuguese",
+  aiTeacherPrompt:
+    "You are a warm Portuguese teacher. Teach the student: Olá, Tchau, Bom dia, Boa noite, Obrigado, Por favor. Speak clearly, model each phrase, and praise their effort.",
+  vocabulary: [
+    { word: "Olá", translation: "Hello", pronunciation: "oh-LAH" },
+    { word: "Tchau", translation: "Goodbye", pronunciation: "CHOW" },
+    { word: "Bom dia", translation: "Good morning", pronunciation: "bom JEE-ah" },
+    { word: "Boa noite", translation: "Good night", pronunciation: "BOH-ah NOY-cheh" },
+    { word: "Obrigado", translation: "Thank you (m)", pronunciation: "oh-bree-GAH-doo" },
+    { word: "Por favor", translation: "Please", pronunciation: "por fah-VOR" },
+    { word: "Sim", translation: "Yes", pronunciation: "seem" },
+    { word: "Não", translation: "No", pronunciation: "NOW" },
+  ],
+  phrases: [
+    { phrase: "Como você se chama?", translation: "What is your name?", context: "Informal" },
+    { phrase: "Meu nome é Ana", translation: "My name is Ana", context: "Introducing yourself" },
+    { phrase: "Muito prazer", translation: "Nice to meet you" },
+  ],
+  activities: [
+    {
+      id: "pt-u1-l1-a1",
+      type: "translation",
+      question: "What does 'Olá' mean?",
+      answer: "Hello",
+      options: ["Goodbye", "Hello", "Thank you", "Please"],
+    },
+    {
+      id: "pt-u1-l1-a2",
+      type: "translation",
+      question: "How do you say 'Thank you' in Portuguese?",
+      answer: "Obrigado",
+      options: ["Por favor", "Olá", "Obrigado", "Tchau"],
+    },
+    {
+      id: "pt-u1-l1-a3",
+      type: "matching",
+      question: "Match: Bom dia",
+      answer: "Good morning",
+      options: ["Good night", "Good morning", "Goodbye", "Hello"],
+    },
+  ],
+};
+
 // Japanese lessons
 export const jaLesson1: Lesson = {
   id: "ja-u1-l1",

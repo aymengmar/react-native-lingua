@@ -14,9 +14,11 @@ import { languages } from "@/data/languages";
 import { images } from "@/constants/images";
 import { useLanguageStore } from "@/store/languageStore";
 import type { Language, LanguageCode } from "@/types/learning";
+import { usePostHog } from "posthog-react-native";
 
 export default function LanguageSelection() {
   const router = useRouter();
+  const posthog = usePostHog();
   const { setSelectedLanguage } = useLanguageStore();
   const [search, setSearch] = useState("");
   const [selectedCode, setSelectedCode] = useState<LanguageCode>("es");
@@ -81,6 +83,11 @@ export default function LanguageSelection() {
       <View className="px-4 pt-2 pb-3">
         <TouchableOpacity
           onPress={() => {
+            const lang = languages.find((l) => l.code === selectedCode);
+            posthog.capture("language_selected", {
+              language_code: selectedCode,
+              language_name: lang?.name,
+            });
             setSelectedLanguage(selectedCode);
             router.replace("/");
           }}

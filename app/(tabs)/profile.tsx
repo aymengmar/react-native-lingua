@@ -4,15 +4,24 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { useLanguageStore } from '@/store/languageStore';
+import { usePostHog } from 'posthog-react-native';
 
 export default function ProfileScreen() {
   const { signOut } = useAuth();
+  const posthog = usePostHog();
   const router = useRouter();
   const { clearSelectedLanguage } = useLanguageStore();
 
   const handleSignOut = async () => {
+    posthog.capture('user_signed_out');
+    posthog.reset();
     await signOut();
     router.replace('/(auth)/sign-in');
+  };
+
+  const handleChangeLanguage = () => {
+    posthog.capture('language_change_initiated');
+    router.push('/language-selection');
   };
 
   return (
@@ -22,7 +31,7 @@ export default function ProfileScreen() {
         <Text className="body-md text-muted mt-2">Profile screen coming soon</Text>
 
         <TouchableOpacity
-          onPress={() => router.push('/language-selection')}
+          onPress={handleChangeLanguage}
           style={styles.button}
           activeOpacity={0.85}
         >

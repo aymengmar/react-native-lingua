@@ -5,8 +5,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { View, Text } from "@/tw";
 import { Image } from "@/tw/image";
 import { images } from "@/constants/images";
+import { usePostHog } from "posthog-react-native";
 
 export default function OnboardingScreen() {
+  const posthog = usePostHog();
+
+  const handleGetStarted = () => {
+    posthog.capture("onboarding_get_started_tapped");
+    router.push("/(auth)/sign-up");
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
       {/* Logo Row */}
@@ -68,7 +76,7 @@ export default function OnboardingScreen() {
       <View className="px-6 pb-8 pt-2">
         <TouchableOpacity
           style={styles.button}
-          onPress={() => router.push("/(auth)/sign-up")}
+          onPress={handleGetStarted}
           activeOpacity={0.85}
         >
           <Text className="text-lg font-poppins-semibold text-white">

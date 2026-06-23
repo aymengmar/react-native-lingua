@@ -15,9 +15,11 @@ import { Image } from "@/tw/image";
 import { images } from "@/constants/images";
 import VerificationModal from "@/components/VerificationModal";
 import { useSignIn } from "@clerk/expo";
+import { usePostHog } from "posthog-react-native";
 
 export default function SignInScreen() {
   const { signIn, fetchStatus } = useSignIn();
+  const posthog = usePostHog();
 
   const [email, setEmail] = useState("");
   const [showVerification, setShowVerification] = useState(false);
@@ -25,8 +27,11 @@ export default function SignInScreen() {
   const isLoading = fetchStatus === "fetching";
 
   const handleSignIn = async () => {
+    posthog.capture("sign_in_submitted", { email });
+
     const { error } = await signIn.emailCode.sendCode({ emailAddress: email });
     if (error) {
+      posthog.captureException(new Error(error.message), { screen: "SignIn", step: "send_code" });
       Alert.alert(
         "Sign In Error",
         error.longMessage || error.message || "Something went wrong."
@@ -41,6 +46,12 @@ export default function SignInScreen() {
     if (error) throw error;
 
     if (signIn.status === "complete") {
+      posthog.identify(email, {
+        $set: { email },
+        $set_once: { first_sign_in_date: new Date().toISOString() },
+      });
+      posthog.capture("sign_in_completed", { email });
+
       await signIn.finalize({
         navigate: ({ decorateUrl }) => {
           const url = decorateUrl("/");

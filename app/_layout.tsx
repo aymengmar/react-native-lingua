@@ -1,10 +1,18 @@
+import { posthog } from "@/lib/posthog";
+import { useLanguageStore } from "@/store/languageStore";
 import { ClerkProvider, useAuth } from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
 import { useFonts } from "expo-font";
-import { Stack, useRouter, useSegments } from "expo-router";
+import {
+  Stack,
+  useGlobalSearchParams,
+  usePathname,
+  useRouter,
+  useSegments,
+} from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
-import { useLanguageStore } from "@/store/languageStore";
+import { PostHogProvider } from "posthog-react-native";
+import { useEffect, useRef } from "react";
 import "../global.css";
 
 SplashScreen.preventAutoHideAsync();
@@ -20,6 +28,19 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
   const { selectedLanguage, _hasHydrated } = useLanguageStore();
+  const pathname = usePathname();
+  const params = useGlobalSearchParams();
+  const previousPathname = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (previousPathname.current !== pathname) {
+      posthog.screen(pathname, {
+        previous_screen: previousPathname.current ?? null,
+        ...params,
+      });
+      previousPathname.current = pathname;
+    }
+  }, [pathname, params]);
 
   useEffect(() => {
     if (!isLoaded || !_hasHydrated) return;
@@ -47,7 +68,10 @@ function RootLayoutNav() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-      <Stack.Screen name="language-selection" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="language-selection"
+        options={{ headerShown: false }}
+      />
     </Stack>
   );
 }
@@ -71,8 +95,17 @@ export default function RootLayout() {
   }
 
   return (
-    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <RootLayoutNav />
-    </ClerkProvider>
+    <PostHogProvider
+      client={posthog}
+      autocapture={{
+        captureScreens: true,
+        captureTouches: true,
+        propsToCapture: ["testID"],
+      }}
+    >
+      <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+        <RootLayoutNav />
+      </ClerkProvider>
+    </PostHogProvider>
   );
 }

@@ -6,6 +6,7 @@ import { useSignUp } from "@clerk/expo";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
+import { usePostHog } from "posthog-react-native";
 
 import {
   ActivityIndicator,
@@ -19,6 +20,7 @@ import {
 
 export default function SignUpScreen() {
   const { signUp, fetchStatus } = useSignUp();
+  const posthog = usePostHog();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,8 +30,11 @@ export default function SignUpScreen() {
   const isLoading = fetchStatus === "fetching";
 
   const handleSignUp = async () => {
+    posthog.capture("sign_up_submitted", { email });
+
     const { error } = await signUp.password({ emailAddress: email, password });
     if (error) {
+      posthog.captureException(new Error(error.message), { screen: "SignUp", step: "password" });
       Alert.alert(
         "Sign Up Error",
         error.longMessage || error.message || "Something went wrong."
@@ -39,6 +44,7 @@ export default function SignUpScreen() {
 
     const { error: sendError } = await signUp.verifications.sendEmailCode();
     if (sendError) {
+      posthog.captureException(new Error(sendError.message), { screen: "SignUp", step: "send_code" });
       Alert.alert(
         "Error",
         sendError.longMessage || sendError.message || "Failed to send code."
@@ -54,6 +60,12 @@ export default function SignUpScreen() {
     if (error) throw error;
 
     if (signUp.status === "complete") {
+      posthog.identify(email, {
+        $set: { email },
+        $set_once: { first_sign_up_date: new Date().toISOString() },
+      });
+      posthog.capture("sign_up_completed", { email });
+
       await signUp.finalize({
         navigate: ({ decorateUrl }) => {
           const url = decorateUrl("/");

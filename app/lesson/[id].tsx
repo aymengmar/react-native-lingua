@@ -1,13 +1,22 @@
-import { useState } from "react";
-import { TouchableOpacity, StatusBar, StyleSheet, View as RNView } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { images } from "@/constants/images";
+import { getLanguageByCode } from "@/data/languages";
+import { getLessonById, getUnitById } from "@/data/units";
 import { Text } from "@/tw";
 import { Image } from "@/tw/image";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { images } from "@/constants/images";
-import { getLessonById, getUnitById } from "@/data/units";
-import { getLanguageByCode } from "@/data/languages";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useState, useEffect } from "react";
+import { usePostHog } from "posthog-react-native";
+import {
+  View as RNView,
+  StatusBar,
+  StyleSheet,
+  TouchableOpacity,
+} from "react-native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 const FEEDBACK = [
   { label: "Speaking", value: "Excellent", color: "#22C55E" },
@@ -19,6 +28,7 @@ export default function AudioLessonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const posthog = usePostHog();
 
   const [isMicOn, setIsMicOn] = useState(true);
   const [showSubtitles, setShowSubtitles] = useState(true);
@@ -28,10 +38,49 @@ export default function AudioLessonScreen() {
   const unit = lesson ? getUnitById(lesson.unitId) : null;
   const language = unit ? getLanguageByCode(unit.languageCode) : null;
 
+  // Track lesson start
+  useEffect(() => {
+    if (lesson) {
+      posthog.capture("ai_lesson_started", {
+        lesson_id: lesson.id,
+        lesson_title: lesson.title,
+        unit_id: lesson.unitId,
+        language_code: unit?.languageCode || "unknown",
+        xp_reward: lesson.xpReward,
+      });
+    }
+  }, [lesson?.id, posthog, unit?.languageCode]);
+
+  // Track phrase advancement
+  useEffect(() => {
+    if (lesson && phraseIndex > 0) {
+      posthog.capture("ai_lesson_phrase_advanced", {
+        lesson_id: lesson.id,
+        phrase_index: phraseIndex,
+        total_phrases: lesson.phrases.length,
+      });
+    }
+  }, [phraseIndex, lesson?.id, posthog]);
+
   if (!lesson) {
+    useEffect(() => {
+      posthog.capture("ai_lesson_not_found", {
+        lesson_id: id,
+      });
+    }, [id, posthog]);
+
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }} edges={["top"]}>
-        <TouchableOpacity onPress={() => router.back()} style={{ padding: 20 }}>
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: "#FFFFFF" }}
+        edges={["top"]}
+      >
+        <TouchableOpacity
+          onPress={() => {
+            posthog.capture("lesson_not_found_back_pressed");
+            router.back();
+          }}
+          style={{ padding: 20 }}
+        >
           <Ionicons name="chevron-back" size={24} color="#0F172A" />
         </TouchableOpacity>
       </SafeAreaView>
@@ -40,13 +89,57 @@ export default function AudioLessonScreen() {
 
   const teacherPhrase = lesson.phrases[phraseIndex % lesson.phrases.length];
 
+  const handleMicToggle = () => {
+    const newState = !isMicOn;
+    setIsMicOn(newState);
+    posthog.capture("ai_lesson_mic_toggled", {
+      lesson_id: lesson.id,
+      mic_enabled: newState,
+    });
+  };
+
+  const handleSubtitlesToggle = () => {
+    const newState = !showSubtitles;
+    setShowSubtitles(newState);
+    posthog.capture("ai_lesson_subtitles_toggled", {
+      lesson_id: lesson.id,
+      subtitles_enabled: newState,
+    });
+  };
+
+  const handleEndCall = () => {
+    posthog.capture("ai_lesson_ended", {
+      lesson_id: lesson.id,
+      lesson_title: lesson.title,
+      phrases_completed: phraseIndex,
+      total_phrases: lesson.phrases.length,
+    });
+    router.back();
+  };
+
+  const handleBackPress = () => {
+    posthog.capture("ai_lesson_back_pressed", {
+      lesson_id: lesson.id,
+      phrases_completed: phraseIndex,
+    });
+    router.back();
+  };
+
+  const handlePhraseAdvance = () => {
+    setPhraseIndex((i) => i + 1);
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* ── Header ──────────────────────────────────────────── */}
       <RNView style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
+        <TouchableOpacity
+          onPress={handleBackPress}
+          style={styles.backBtn}
+          hitSlop={8}
+        >
           <Ionicons name="chevron-back" size={24} color="#0F172A" />
         </TouchableOpacity>
 
@@ -93,7 +186,7 @@ export default function AudioLessonScreen() {
           </RNView>
           <TouchableOpacity
             style={styles.speakerBtn}
-            onPress={() => setPhraseIndex((i) => i + 1)}
+            onPress={handlePhraseAdvance}
             hitSlop={8}
           >
             <Ionicons name="volume-medium" size={20} color="#FFFFFF" />
@@ -102,14 +195,16 @@ export default function AudioLessonScreen() {
       </RNView>
 
       {/* ── Bottom section ───────────────────────────────────── */}
-      <RNView style={[styles.bottomPanel, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-
+      <RNView
+        style={[
+          styles.bottomPanel,
+          { paddingBottom: Math.max(insets.bottom, 16) },
+        ]}
+      >
         {/* Lesson context */}
         <RNView style={styles.lessonContext}>
           <RNView style={styles.lessonContextRow}>
-            {language && (
-              <Text style={styles.lessonFlag}>{language.flag}</Text>
-            )}
+            {language && <Text style={styles.lessonFlag}>{language.flag}</Text>}
             <Text style={styles.lessonLang} numberOfLines={1}>
               {language?.name ?? ""} · {lesson.title}
             </Text>
@@ -131,7 +226,7 @@ export default function AudioLessonScreen() {
           <RNView style={styles.controlItem}>
             <TouchableOpacity
               style={styles.controlBtn}
-              onPress={() => setIsMicOn((v) => !v)}
+              onPress={handleMicToggle}
             >
               <Ionicons
                 name={isMicOn ? "mic" : "mic-off"}
@@ -144,8 +239,11 @@ export default function AudioLessonScreen() {
 
           <RNView style={styles.controlItem}>
             <TouchableOpacity
-              style={[styles.controlBtn, !showSubtitles && styles.controlBtnOff]}
-              onPress={() => setShowSubtitles((v) => !v)}
+              style={[
+                styles.controlBtn,
+                !showSubtitles && styles.controlBtnOff,
+              ]}
+              onPress={handleSubtitlesToggle}
             >
               <Ionicons name="text" size={22} color="#0F172A" />
             </TouchableOpacity>
@@ -155,7 +253,7 @@ export default function AudioLessonScreen() {
           <RNView style={styles.controlItem}>
             <TouchableOpacity
               style={[styles.controlBtn, styles.endCallBtn]}
-              onPress={() => router.back()}
+              onPress={handleEndCall}
             >
               <RNView style={styles.endCallIconWrap}>
                 <Ionicons name="call" size={22} color="#FFFFFF" />

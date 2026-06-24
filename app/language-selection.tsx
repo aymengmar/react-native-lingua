@@ -86,7 +86,7 @@ export default function LanguageSelection() {
             const lang = languages.find((l) => l.code === selectedCode);
             posthog.capture("language_selected", {
               language_code: selectedCode,
-              language_name: lang?.name,
+              language_name: lang?.name ?? null,
             });
             setSelectedLanguage(selectedCode);
             router.replace("/");

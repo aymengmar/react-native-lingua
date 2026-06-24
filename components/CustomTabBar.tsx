@@ -1,6 +1,6 @@
 import { View, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { Text } from '@/tw';
-import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import type { BottomTabBarProps } from 'expo-router/build/react-navigation/bottom-tabs/types';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Animated, {
   useSharedValue,

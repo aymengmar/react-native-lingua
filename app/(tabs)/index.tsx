@@ -1,15 +1,15 @@
-import { TouchableOpacity, StyleSheet } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { View, Text, ScrollView } from "@/tw";
+import { images, placeholderImages } from "@/constants/images";
+import { getLanguageByCode } from "@/data/languages";
+import { getUnitsByLanguage } from "@/data/units";
+import { useLanguageStore } from "@/store/languageStore";
+import { useProgressStore } from "@/store/progressStore";
+import { ScrollView, Text, View } from "@/tw";
 import { Image } from "@/tw/image";
 import { useUser } from "@clerk/expo";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useLanguageStore } from "@/store/languageStore";
-import { useProgressStore } from "@/store/progressStore";
-import { images } from "@/constants/images";
-import { getLanguageByCode } from "@/data/languages";
-import { getUnitsByLanguage } from "@/data/units";
 import { usePostHog } from "posthog-react-native";
+import { StyleSheet, TouchableOpacity } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const GREETINGS: Record<string, string> = {
   es: "Hola",
@@ -36,7 +36,9 @@ export default function HomeScreen() {
   const { currentXp, dailyGoalXp, streak, completedLessons } =
     useProgressStore();
 
-  const language = selectedLanguage ? getLanguageByCode(selectedLanguage) : null;
+  const language = selectedLanguage
+    ? getLanguageByCode(selectedLanguage)
+    : null;
   const units = selectedLanguage ? getUnitsByLanguage(selectedLanguage) : [];
   const currentUnit = units[0];
   const currentLesson = currentUnit?.lessons[0];
@@ -111,7 +113,11 @@ export default function HomeScreen() {
               </Text>
             </View>
             <TouchableOpacity activeOpacity={0.7} hitSlop={8}>
-              <Ionicons name="notifications-outline" size={24} color="#001328" />
+              <Ionicons
+                name="notifications-outline"
+                size={24}
+                color="#001328"
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -154,10 +160,7 @@ export default function HomeScreen() {
                 >
                   Continue learning
                 </Text>
-                <Text
-                  className="h2"
-                  style={{ color: "#FFFFFF", marginTop: 2 }}
-                >
+                <Text className="h2" style={{ color: "#FFFFFF", marginTop: 2 }}>
                   {language.name}
                 </Text>
                 <Text
@@ -223,36 +226,42 @@ export default function HomeScreen() {
                       })
                     }
                   >
-                  <View className="flex-row items-center px-4 py-3 gap-3">
-                    {/* Icon */}
-                    <View
-                      className="w-11 h-11 rounded-xl items-center justify-center"
-                      style={{ backgroundColor: item.iconBg }}
-                    >
-                      <Ionicons
-                        name={item.icon}
-                        size={20}
-                        color={item.iconColor}
-                      />
-                    </View>
-
-                    {/* Text */}
-                    <View className="flex-1">
-                      <Text className="body-md font-poppins-semibold text-foreground">
-                        {item.title}
-                      </Text>
-                      <Text className="body-sm text-muted">{item.subtitle}</Text>
-                    </View>
-
-                    {/* Status */}
-                    {item.completed ? (
-                      <View className="w-6 h-6 rounded-full bg-lingua-purple items-center justify-center">
-                        <Ionicons name="checkmark" size={13} color="#FFFFFF" />
+                    <View className="flex-row items-center px-4 py-3 gap-3">
+                      {/* Icon */}
+                      <View
+                        className="w-11 h-11 rounded-xl items-center justify-center"
+                        style={{ backgroundColor: item.iconBg }}
+                      >
+                        <Ionicons
+                          name={item.icon}
+                          size={20}
+                          color={item.iconColor}
+                        />
                       </View>
-                    ) : (
-                      <View className="w-6 h-6 rounded-full border-2 border-border" />
-                    )}
-                  </View>
+
+                      {/* Text */}
+                      <View className="flex-1">
+                        <Text className="body-md font-poppins-semibold text-foreground">
+                          {item.title}
+                        </Text>
+                        <Text className="body-sm text-muted">
+                          {item.subtitle}
+                        </Text>
+                      </View>
+
+                      {/* Status */}
+                      {item.completed ? (
+                        <View className="w-6 h-6 rounded-full bg-lingua-purple items-center justify-center">
+                          <Ionicons
+                            name="checkmark"
+                            size={13}
+                            color="#FFFFFF"
+                          />
+                        </View>
+                      ) : (
+                        <View className="w-6 h-6 rounded-full border-2 border-border" />
+                      )}
+                    </View>
                   </TouchableOpacity>
 
                   {index < todaysPlan.length - 1 && (
@@ -275,7 +284,7 @@ export default function HomeScreen() {
 
             <View className="flex-row items-center gap-2">
               <Image
-                source={{ uri: "https://picsum.photos/id/1005/100/100" }}
+                source={{ uri: placeholderImages.aiTeacherAvatar }}
                 style={{ width: 52, height: 52, borderRadius: 26 }}
                 contentFit="cover"
               />
@@ -283,7 +292,9 @@ export default function HomeScreen() {
                 style={styles.videoBtn}
                 activeOpacity={0.85}
                 onPress={() =>
-                  posthog.capture("ai_video_call_started", { language: selectedLanguage })
+                  posthog.capture("ai_video_call_started", {
+                    language: selectedLanguage,
+                  })
                 }
               >
                 <Ionicons name="videocam" size={20} color="#FFFFFF" />

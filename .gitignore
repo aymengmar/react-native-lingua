@@ -32,6 +32,8 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env
+.env.local
 
 # typescript
 *.tsbuildinfo
@@ -44,3 +46,8 @@ app-example
 .env
 .env
 .env.local
+.env
+.env.local
+.env.*.local
+vision-agent/.env.example
+vision-agent/.env

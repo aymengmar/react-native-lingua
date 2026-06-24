@@ -11,6 +11,7 @@ Environment (loaded in order — local .env overrides parent):
   OPENAI_API_KEY      - added in vision-agent/.env
 """
 
+import asyncio
 import os
 from typing import Optional
 
@@ -49,22 +50,20 @@ LANGUAGE_NAMES: dict[str, str] = {
 }
 
 DEFAULT_SYSTEM_PROMPT = (
-    "You are a warm, energetic AI language teacher having a real voice conversation with a student. "
-    "You always speak English and use English to teach the target language. "
-    "You operate in exactly two modes and NEVER mix them:\n"
-    "TEACHING MODE: Say one word or phrase in the target language, its English meaning, and one "
-    "pronunciation tip. End with a single question like 'Can you say that?' or 'Give it a try!'. "
-    "Your turn is OVER at that question mark. Stop speaking. Output nothing else.\n"
-    "REACTING MODE: You have just received actual speech from the student. "
-    "React to what they actually said — one sentence of praise or correction — "
-    "then either ask them to try again or introduce the next word. Stop.\n"
-    "ABSOLUTE RULES:\n"
-    "- Never say 'Nice job', 'Perfect', 'Great', or any praise unless the student has "
-    "ACTUALLY spoken in the current turn.\n"
-    "- Never continue past a question mark. Every question is a hard stop.\n"
-    "- Never role-play the student's response or write what you imagine they said.\n"
-    "- Keep every reply to one or two short sentences maximum.\n"
-    "- Stay strictly within the current lesson's vocabulary."
+    "You are a warm, energetic language teacher having a real voice conversation with a student. "
+    "You teach in English and introduce target-language words one at a time — say the word clearly, "
+    "give its English meaning, add one simple pronunciation tip, then ask the student to try saying it. "
+    "Keep every reply to one or two short, natural sentences. Use contractions and a friendly tone — "
+    "'Let's try this one!', 'You've got it!', 'Almost — give it another go!'. "
+    "After every word or phrase you introduce, ask the student a single question to invite them to respond, "
+    "then stop and wait for their reply. "
+    "When the student speaks, listen carefully to what they actually said and react to that specifically — "
+    "if they got it right, give a warm one-sentence reaction and move to the next word; "
+    "if they struggled, encourage them briefly and ask them to try once more. "
+    "Never imagine or role-play what the student said. "
+    "Never teach words or phrases outside the current lesson's vocabulary. "
+    "Never switch topics or introduce another language into the lesson. "
+    "Stay patient, stay positive, and keep the pace comfortable for a beginner."
 )
 
 
@@ -95,8 +94,12 @@ async def create_agent(**kwargs) -> Agent:
                         "transcription": {"model": "gpt-4o-mini-transcribe"},
                         "turn_detection": ServerVad(
                             type="server_vad",
-                            threshold=0.4,
-                            prefix_padding_ms=200,
+                            # Lower threshold so even quiet ambient audio
+                            # triggers the interrupt quickly after PTT press.
+                            threshold=0.25,
+                            # Short prefix so interrupt fires within ~50 ms of
+                            # the first sound — feels near-instant to student.
+                            prefix_padding_ms=50,
                             silence_duration_ms=400,
                             interrupt_response=True,
                         ),
@@ -201,7 +204,17 @@ async def join_call(agent: Agent, call_type: str, call_id: str, **kwargs) -> Non
                 except Exception as e:
                     print(f"[agent] send_custom_event error: {e}")
             elif event.mode == "final":
+                final_text = "".join(partial_agent)
                 partial_agent.clear()
+                if final_text:
+                    try:
+                        await agent.send_custom_event({
+                            "type": "transcript_final",
+                            "speaker": "agent",
+                            "text": final_text,
+                        })
+                    except Exception as e:
+                        print(f"[agent] send_custom_event error: {e}")
 
         elif isinstance(event, RealtimeUserTranscript):
             if event.mode == "delta" and event.text:
@@ -215,7 +228,41 @@ async def join_call(agent: Agent, call_type: str, call_id: str, **kwargs) -> Non
                 except Exception as e:
                     print(f"[agent] send_custom_event error: {e}")
             elif event.mode == "final":
+                final_text = "".join(partial_user)
                 partial_user.clear()
+                if final_text:
+                    try:
+                        await agent.send_custom_event({
+                            "type": "transcript_final",
+                            "speaker": "user",
+                            "text": final_text,
+                        })
+                    except Exception as e:
+                        print(f"[agent] send_custom_event error: {e}")
+
+        else:
+            # Check for Stream custom events sent by the mobile app.
+            # The PTT interrupt event asks us to cancel the current response
+            # immediately so the student can speak without hearing the agent.
+            try:
+                custom: dict = {}
+                if isinstance(event, dict):
+                    custom = event.get("custom", {}) or {}
+                elif hasattr(event, "custom"):
+                    custom = event.custom or {}
+                if custom.get("type") == "ptt_interrupt":
+                    # Try each known cancellation approach in order.
+                    for method_name in ("interrupt", "cancel", "cancel_response"):
+                        fn = getattr(agent, method_name, None)
+                        if callable(fn):
+                            try:
+                                await fn()
+                                print("[agent] Response cancelled via ptt_interrupt")
+                            except Exception:
+                                pass
+                            break
+            except Exception:
+                pass
 
     agent.subscribe(on_transcript)
 
@@ -244,7 +291,14 @@ async def join_call(agent: Agent, call_type: str, call_id: str, **kwargs) -> Non
             )
 
         await agent.simple_response(context)
-        await agent.finish()
+        # Do NOT call agent.finish() here — that closes the Realtime connection
+        # immediately after the greeting and makes the agent deaf to student input.
+        # Instead, stay in this block so server_vad continues to detect speech
+        # and trigger responses for the full lesson.
+        try:
+            await asyncio.sleep(3600)  # 1-hour ceiling; cancelled when the call ends
+        except asyncio.CancelledError:
+            pass
 
 
 if __name__ == "__main__":

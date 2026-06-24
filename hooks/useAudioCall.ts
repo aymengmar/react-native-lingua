@@ -32,7 +32,11 @@ interface UseAudioCallReturn {
   agentStatus: AgentStatus;
   isMuted: boolean;
   error: string | null;
-  toggleMic: () => Promise<void>;
+  agentCaption: string;
+  userCaption: string;
+  enableMic: () => Promise<void>;
+  disableMic: () => Promise<void>;
+  interruptAgent: () => Promise<void>;
   endCall: () => Promise<void>;
 }
 
@@ -87,9 +91,13 @@ export function useAudioCall(
   const [agentStatus, setAgentStatus] = useState<AgentStatus>("idle");
   const [isMuted, setIsMuted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [agentCaption, setAgentCaption] = useState("");
+  const [userCaption, setUserCaption] = useState("");
 
   const callRef = useRef<Call | null>(null);
   const agentSessionIdRef = useRef<string | null>(null);
+  const agentClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const userClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Prevents race where agent starts after cleanup has already run.
   const cleanedUpRef = useRef(false);
   // Use a ref so the join callback always sees the latest context without
@@ -143,9 +151,48 @@ export function useAudioCall(
       }
     });
 
+    // Receive real-time transcript events from the agent so we can display
+    // live captions for both the teacher's speech and the student's speech.
+    const captionUnsub = c.on("custom", (event) => {
+      const data = (event as { custom?: Record<string, unknown> }).custom;
+      if (!data) return;
+      const { type, speaker, text } = data as {
+        type?: string;
+        speaker?: string;
+        text?: string;
+      };
+      const caption = text ?? "";
+
+      if (type === "transcript_partial") {
+        if (speaker === "agent") {
+          if (agentClearTimerRef.current) clearTimeout(agentClearTimerRef.current);
+          setAgentCaption(caption);
+        } else if (speaker === "user") {
+          if (userClearTimerRef.current) clearTimeout(userClearTimerRef.current);
+          setUserCaption(caption);
+        }
+      } else if (type === "transcript_final") {
+        if (speaker === "agent") {
+          setAgentCaption(caption);
+          if (agentClearTimerRef.current) clearTimeout(agentClearTimerRef.current);
+          agentClearTimerRef.current = setTimeout(() => setAgentCaption(""), 2500);
+        } else if (speaker === "user") {
+          setUserCaption(caption);
+          if (userClearTimerRef.current) clearTimeout(userClearTimerRef.current);
+          userClearTimerRef.current = setTimeout(() => setUserCaption(""), 2500);
+        }
+      }
+    });
+
     c.join({ create: true })
       .then(async () => {
         if (cleanedUpRef.current) return;
+
+        // Start muted — student uses push-to-talk, so the AI never picks up its
+        // own audio from the speaker and echoes back into the conversation.
+        try {
+          await c.microphone.disable();
+        } catch {}
 
         // Pack lesson context into the call's custom data so the agent reads it
         // when it joins. This runs before we start the agent session.
@@ -200,6 +247,10 @@ export function useAudioCall(
       stateSub.unsubscribe();
       micSub.unsubscribe();
       participantSub.unsubscribe();
+      captionUnsub();
+
+      if (agentClearTimerRef.current) clearTimeout(agentClearTimerRef.current);
+      if (userClearTimerRef.current) clearTimeout(userClearTimerRef.current);
 
       // Stop agent session (best-effort — do not await in cleanup).
       const sessionId = agentSessionIdRef.current;
@@ -221,17 +272,35 @@ export function useAudioCall(
     };
   }, [client, callId]);
 
-  const toggleMic = async () => {
+  const enableMic = async () => {
     const current = callRef.current;
     if (!current) return;
     try {
-      if (isMuted) {
-        await current.microphone.enable();
-      } else {
-        await current.microphone.disable();
-      }
+      await current.microphone.enable();
     } catch (err) {
-      console.error("[useAudioCall] toggleMic error", err);
+      console.error("[useAudioCall] enableMic error", err);
+    }
+  };
+
+  const disableMic = async () => {
+    const current = callRef.current;
+    if (!current) return;
+    try {
+      await current.microphone.disable();
+    } catch (err) {
+      console.error("[useAudioCall] disableMic error", err);
+    }
+  };
+
+  // Sends a custom event to the call so the Python agent can cancel its current
+  // response immediately, before VAD detects the student's voice.
+  const interruptAgent = async () => {
+    const current = callRef.current;
+    if (!current) return;
+    try {
+      await current.sendCustomEvent({ type: "ptt_interrupt" });
+    } catch {
+      // best-effort; VAD will still interrupt when student starts speaking
     }
   };
 
@@ -258,5 +327,5 @@ export function useAudioCall(
     setStatus("ended");
   };
 
-  return { call, status, agentStatus, isMuted, error, toggleMic, endCall };
+  return { call, status, agentStatus, isMuted, error, agentCaption, userCaption, enableMic, disableMic, interruptAgent, endCall };
 }

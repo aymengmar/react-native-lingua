@@ -15,6 +15,7 @@ import {
   StatusBar,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   ActivityIndicator,
 } from "react-native";
 import {
@@ -28,7 +29,6 @@ const FEEDBACK = [
   { label: "Grammar", value: "Good", color: "#4B6FDE" },
 ] as const;
 
-/** Map a Stream calling state to a human-readable label shown in the header. */
 function statusLabel(
   status: "idle" | "connecting" | "joined" | "reconnecting" | "error" | "ended"
 ): string {
@@ -48,7 +48,6 @@ function statusLabel(
   }
 }
 
-/** Dot color for the connection indicator in the header. */
 function statusColor(
   status: "idle" | "connecting" | "joined" | "reconnecting" | "error" | "ended"
 ): string {
@@ -96,18 +95,15 @@ export default function AudioLessonScreen() {
   const posthog = usePostHog();
   const { user } = useUser();
 
-  const [showSubtitles, setShowSubtitles] = useState(true);
   const [phraseIndex, setPhraseIndex] = useState(0);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const lesson = getLessonById(id);
   const unit = lesson ? getUnitById(lesson.unitId) : null;
   const language = unit ? getLanguageByCode(unit.languageCode) : null;
 
-  // Build a deterministic call ID from the lesson ID so every student who
-  // opens the same lesson joins the same audio room.
   const callId = lesson ? `lesson-${toCallId(lesson.id)}` : null;
 
-  // Build lesson context once; values don't change during a lesson.
   const lessonContext =
     lesson && unit
       ? {
@@ -120,11 +116,9 @@ export default function AudioLessonScreen() {
         }
       : null;
 
-  // Stream audio_room call — joins immediately, starts Vision Agent, cleans up on unmount.
-  const { status: callStatus, agentStatus, isMuted, toggleMic, endCall } =
+  const { status: callStatus, agentStatus, agentCaption, userCaption, enableMic, disableMic, interruptAgent, endCall } =
     useAudioCall(callId, lessonContext);
 
-  // Track lesson start
   useEffect(() => {
     if (lesson) {
       posthog.capture("ai_lesson_started", {
@@ -137,7 +131,6 @@ export default function AudioLessonScreen() {
     }
   }, [lesson?.id, posthog, unit?.languageCode]);
 
-  // Track phrase advancement
   useEffect(() => {
     if (lesson && phraseIndex > 0) {
       posthog.capture("ai_lesson_phrase_advanced", {
@@ -169,21 +162,17 @@ export default function AudioLessonScreen() {
 
   const teacherPhrase = lesson.phrases[phraseIndex % lesson.phrases.length];
 
-  const handleMicToggle = async () => {
-    await toggleMic();
-    posthog.capture("ai_lesson_mic_toggled", {
-      lesson_id: lesson.id,
-      mic_enabled: isMuted, // will be toggled after this call
-    });
+  const handleMicPressIn = async () => {
+    setIsSpeaking(true);
+    // Fire both in parallel: interrupt the agent immediately AND open the mic.
+    await Promise.all([interruptAgent(), enableMic()]);
+    posthog.capture("ai_lesson_ptt_start", { lesson_id: lesson.id });
   };
 
-  const handleSubtitlesToggle = () => {
-    const newState = !showSubtitles;
-    setShowSubtitles(newState);
-    posthog.capture("ai_lesson_subtitles_toggled", {
-      lesson_id: lesson.id,
-      subtitles_enabled: newState,
-    });
+  const handleMicPressOut = async () => {
+    setIsSpeaking(false);
+    await disableMic();
+    posthog.capture("ai_lesson_ptt_stop", { lesson_id: lesson.id });
   };
 
   const handleEndCall = async () => {
@@ -205,10 +194,6 @@ export default function AudioLessonScreen() {
     router.back();
   };
 
-  const handlePhraseAdvance = () => {
-    setPhraseIndex((i) => i + 1);
-  };
-
   const displayName = user?.fullName ?? user?.firstName ?? "You";
   const initials = displayName
     .split(" ")
@@ -216,6 +201,8 @@ export default function AudioLessonScreen() {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+
+  const canSpeak = callStatus === "joined" && agentStatus === "connected";
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
@@ -241,10 +228,7 @@ export default function AudioLessonScreen() {
               ]}
             />
             <Text
-              style={[
-                styles.onlineLabel,
-                { color: statusColor(callStatus) },
-              ]}
+              style={[styles.onlineLabel, { color: statusColor(callStatus) }]}
             >
               {statusLabel(callStatus)}
             </Text>
@@ -267,18 +251,19 @@ export default function AudioLessonScreen() {
           </RNView>
         </RNView>
 
-        <RNView style={styles.headerRight}>
-          <RNView style={styles.headerIconBtn}>
-            <Ionicons name="videocam-outline" size={16} color="#0F172A" />
+        {/* End call button — top right */}
+        <TouchableOpacity
+          onPress={handleEndCall}
+          style={styles.endCallHeaderBtn}
+          hitSlop={8}
+        >
+          <RNView style={styles.endCallIconWrap}>
+            <Ionicons name="call" size={20} color="#FFFFFF" />
           </RNView>
-          <Text style={styles.headerCount}>12</Text>
-          <RNView style={styles.headerIconBtn}>
-            <Ionicons name="notifications-outline" size={17} color="#0F172A" />
-          </RNView>
-        </RNView>
+        </TouchableOpacity>
       </RNView>
 
-      {/* ── Main area (room background) ─────────────────────── */}
+      {/* ── Main area ───────────────────────────────────────── */}
       <RNView style={styles.mainArea}>
         <Image
           source={images.mascotWelcome}
@@ -286,7 +271,7 @@ export default function AudioLessonScreen() {
           contentFit="contain"
         />
 
-        {/* Student preview — top-right corner with user initials */}
+        {/* Student preview — top-right corner */}
         <RNView style={styles.userPreview}>
           <RNView style={styles.userPreviewBg} />
           {user?.imageUrl ? (
@@ -300,34 +285,61 @@ export default function AudioLessonScreen() {
               <Text style={styles.userInitials}>{initials}</Text>
             </RNView>
           )}
-          {/* Muted badge on the student preview */}
-          {isMuted && (
-            <RNView style={styles.mutedBadge}>
-              <Ionicons name="mic-off" size={10} color="#FFFFFF" />
+          {/* Speaking badge when mic is active */}
+          {isSpeaking && (
+            <RNView style={styles.speakingBadge}>
+              <Ionicons name="mic" size={10} color="#FFFFFF" />
             </RNView>
           )}
         </RNView>
 
-        {/* Teacher speech bubble */}
+        {/* User live caption — appears near the user preview when the student speaks */}
+        {userCaption ? (
+          <RNView style={styles.userCaptionBubble}>
+            <RNView style={styles.userCaptionHeader}>
+              <RNView style={styles.captionLiveDot} />
+              <Text style={styles.userCaptionLabel}>You</Text>
+            </RNView>
+            <Text style={styles.userCaptionText} numberOfLines={3}>
+              {userCaption}
+            </Text>
+          </RNView>
+        ) : null}
+
+        {/* Teacher speech bubble — shows live agent caption or the lesson phrase hint */}
         <RNView style={styles.speechBubble}>
           <RNView style={styles.speechContent}>
-            <Text style={styles.speechMain}>{teacherPhrase.phrase}</Text>
-            {showSubtitles && (
-              <Text style={styles.speechSub}>
-                {teacherPhrase.translation} 👏
-              </Text>
+            {agentCaption ? (
+              <>
+                <RNView style={styles.agentCaptionHeader}>
+                  <RNView style={[styles.captionLiveDot, styles.captionLiveDotPurple]} />
+                  <Text style={styles.agentCaptionLabel}>AI Teacher</Text>
+                </RNView>
+                <Text style={styles.speechMain} numberOfLines={4}>
+                  {agentCaption}
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.speechMain}>{teacherPhrase.phrase}</Text>
+                <Text style={styles.speechSub}>
+                  {teacherPhrase.translation} 👏
+                </Text>
+              </>
             )}
           </RNView>
-          <TouchableOpacity
-            style={styles.speakerBtn}
-            onPress={handlePhraseAdvance}
-            hitSlop={8}
-          >
-            <Ionicons name="volume-medium" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
+          {!agentCaption && (
+            <TouchableOpacity
+              style={styles.speakerBtn}
+              onPress={() => setPhraseIndex((i) => i + 1)}
+              hitSlop={8}
+            >
+              <Ionicons name="volume-medium" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
         </RNView>
 
-        {/* Connecting overlay — shown while Stream call is joining */}
+        {/* Connecting overlay */}
         {(callStatus === "connecting" || callStatus === "idle") && (
           <RNView style={styles.overlay}>
             <ActivityIndicator size="large" color="#6C4EF5" />
@@ -367,7 +379,7 @@ export default function AudioLessonScreen() {
       <RNView
         style={[
           styles.bottomPanel,
-          { paddingBottom: Math.max(insets.bottom, 16) },
+          { paddingBottom: Math.max(insets.bottom, 20) },
         ]}
       >
         {/* Lesson context */}
@@ -383,54 +395,33 @@ export default function AudioLessonScreen() {
           </Text>
         </RNView>
 
-        {/* Controls row */}
-        <RNView style={styles.controlsRow}>
-          <RNView style={styles.controlItem}>
-            <TouchableOpacity style={styles.controlBtn}>
-              <Ionicons name="videocam-off" size={22} color="#0F172A" />
-            </TouchableOpacity>
-            <Text style={styles.controlLabel}>Camera</Text>
-          </RNView>
-
-          <RNView style={styles.controlItem}>
-            <TouchableOpacity
-              style={[styles.controlBtn, isMuted && styles.controlBtnOff]}
-              onPress={handleMicToggle}
-              disabled={callStatus !== "joined"}
-            >
-              <Ionicons
-                name={isMuted ? "mic-off" : "mic"}
-                size={22}
-                color={isMuted ? "#94A3B8" : "#0F172A"}
-              />
-            </TouchableOpacity>
-            <Text style={styles.controlLabel}>{isMuted ? "Unmute" : "Mic"}</Text>
-          </RNView>
-
-          <RNView style={styles.controlItem}>
-            <TouchableOpacity
-              style={[
-                styles.controlBtn,
-                !showSubtitles && styles.controlBtnOff,
-              ]}
-              onPress={handleSubtitlesToggle}
-            >
-              <Ionicons name="text" size={22} color="#0F172A" />
-            </TouchableOpacity>
-            <Text style={styles.controlLabel}>Subtitles</Text>
-          </RNView>
-
-          <RNView style={styles.controlItem}>
-            <TouchableOpacity
-              style={[styles.controlBtn, styles.endCallBtn]}
-              onPress={handleEndCall}
-            >
-              <RNView style={styles.endCallIconWrap}>
-                <Ionicons name="call" size={22} color="#FFFFFF" />
-              </RNView>
-            </TouchableOpacity>
-            <Text style={styles.controlLabel}>End Call</Text>
-          </RNView>
+        {/* Push-to-talk mic button */}
+        <RNView style={styles.pttRow}>
+          <Pressable
+            onPressIn={handleMicPressIn}
+            onPressOut={handleMicPressOut}
+            disabled={!canSpeak}
+            style={({ pressed }) => [
+              styles.pttBtn,
+              pressed && styles.pttBtnActive,
+              !canSpeak && styles.pttBtnDisabled,
+            ]}
+          >
+            <Ionicons
+              name={isSpeaking ? "mic" : "mic-outline"}
+              size={34}
+              color="#FFFFFF"
+            />
+          </Pressable>
+          <Text style={styles.pttLabel}>
+            {!canSpeak
+              ? agentStatus === "connecting"
+                ? "Teacher joining…"
+                : "Connecting…"
+              : isSpeaking
+              ? "Listening…"
+              : "Hold to speak"}
+          </Text>
         </RNView>
 
         {/* Feedback card */}
@@ -492,35 +483,30 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: "#22C55E",
   },
   onlineLabel: {
-    color: "#22C55E",
     fontSize: 12,
     fontFamily: "Poppins-Regular",
     lineHeight: 18,
   },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  headerIconBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "#F1F5F9",
+  endCallHeaderBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#EF4444",
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#EF4444",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 5,
   },
-  headerCount: {
-    color: "#0F172A",
-    fontSize: 14,
-    fontFamily: "Poppins-SemiBold",
-    lineHeight: 20,
+  endCallIconWrap: {
+    transform: [{ rotate: "135deg" }],
   },
 
-  // ── Main area (room background) ──────────────────────────────
+  // ── Main area ──────────────────────────────────────────────
   mainArea: {
     flex: 1,
     position: "relative",
@@ -568,14 +554,14 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontFamily: "Poppins-Bold",
   },
-  mutedBadge: {
+  speakingBadge: {
     position: "absolute",
     bottom: 6,
     right: 6,
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: "#EF4444",
+    backgroundColor: "#22C55E",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -657,7 +643,7 @@ const styles = StyleSheet.create({
 
   // ── Lesson context ───────────────────────────────────────────
   lessonContext: {
-    marginBottom: 14,
+    marginBottom: 20,
   },
   lessonContextRow: {
     flexDirection: "row",
@@ -682,49 +668,41 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  // ── Controls ─────────────────────────────────────────────────
-  controlsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 16,
-    paddingHorizontal: 8,
-  },
-  controlItem: {
+  // ── Push-to-talk ─────────────────────────────────────────────
+  pttRow: {
     alignItems: "center",
-    gap: 8,
+    marginBottom: 20,
   },
-  controlBtn: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#FFFFFF",
+  pttBtn: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#6C4EF5",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  controlBtnOff: {
-    backgroundColor: "#F1F5F9",
-  },
-  endCallBtn: {
-    backgroundColor: "#EF4444",
-    borderWidth: 0,
-    shadowColor: "#EF4444",
+    shadowColor: "#6C4EF5",
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  endCallIconWrap: {
-    transform: [{ rotate: "135deg" }],
+  pttBtnActive: {
+    backgroundColor: "#22C55E",
+    shadowColor: "#22C55E",
+    shadowOpacity: 0.5,
+    transform: [{ scale: 1.08 }],
   },
-  controlLabel: {
-    fontSize: 11,
+  pttBtnDisabled: {
+    backgroundColor: "#94A3B8",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  pttLabel: {
+    marginTop: 10,
+    fontSize: 13,
     fontFamily: "Poppins-Regular",
     color: "#64748B",
+    textAlign: "center",
   },
 
   // ── Feedback card ────────────────────────────────────────────
@@ -755,5 +733,62 @@ const styles = StyleSheet.create({
   feedbackValue: {
     fontSize: 14,
     fontFamily: "Poppins-SemiBold",
+  },
+
+  // ── Live captions ─────────────────────────────────────────────
+  captionLiveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "#22C55E",
+  },
+  captionLiveDotPurple: {
+    backgroundColor: "#6C4EF5",
+  },
+  agentCaptionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 4,
+  },
+  agentCaptionLabel: {
+    fontSize: 11,
+    fontFamily: "Poppins-SemiBold",
+    color: "#6C4EF5",
+    letterSpacing: 0.3,
+  },
+  userCaptionBubble: {
+    position: "absolute",
+    top: 134,
+    right: 14,
+    maxWidth: 160,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    borderTopRightRadius: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  userCaptionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 3,
+  },
+  userCaptionLabel: {
+    fontSize: 11,
+    fontFamily: "Poppins-SemiBold",
+    color: "#22C55E",
+    letterSpacing: 0.3,
+  },
+  userCaptionText: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    color: "#0F172A",
+    lineHeight: 18,
   },
 });
